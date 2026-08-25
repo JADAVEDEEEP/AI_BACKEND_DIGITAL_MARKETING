@@ -5,6 +5,10 @@ const {
   finalResearchPrompt,
 } = require("../prompts/masterPrompt");
 
+const {
+  saveResearchToSheet,
+} = require("./googleSheets.service");
+
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
@@ -94,6 +98,7 @@ function parseGeminiJSON(text) {
     return JSON.parse(cleanJson);
   } catch (error) {
     console.error("JSON Parse Failed");
+
     console.error(
       "Clean JSON:",
       cleanJson.substring(0, 2000)
@@ -167,6 +172,9 @@ async function callGemini(prompt, stageName) {
  *
  * Stage 2:
  * Evaluate candidates and generate final research.
+ *
+ * Stage 3:
+ * Save candidate pool to Google Sheets.
  */
 const generateCompanyReport = async ({
   agencyType,
@@ -237,7 +245,7 @@ const generateCompanyReport = async ({
       );
     }
 
-    // Gemini may sometimes return fewer than 100.
+    // Gemini may sometimes return fewer than 100
     if (candidates.length < 100) {
       console.warn(
         `⚠️ Stage 1 returned ${candidates.length} candidates instead of 100.`
@@ -249,6 +257,7 @@ const generateCompanyReport = async ({
     // ==================================================
 
     const uniqueCandidates = [];
+
     const seenCompanies = new Set();
 
     for (const company of candidates) {
@@ -271,7 +280,10 @@ const generateCompanyReport = async ({
       uniqueCandidates.push(company);
     }
 
-    // Re-rank candidates after duplicate removal
+    // ==================================================
+    // RE-RANK CANDIDATES
+    // ==================================================
+
     const normalizedCandidates =
       uniqueCandidates.map(
         (company, index) => ({
@@ -341,11 +353,47 @@ const generateCompanyReport = async ({
     };
 
     // ==================================================
+    // SAVE CANDIDATES TO GOOGLE SHEETS
+    // ==================================================
+
+    console.log(
+      "\n================ GOOGLE SHEETS START ================"
+    );
+
+    try {
+      const sheetResult =
+        await saveResearchToSheet(report);
+
+      console.log(
+        "Google Sheets Result:",
+        sheetResult
+      );
+
+      console.log(
+        `✅ Google Sheets: ${normalizedCandidates.length} candidates saved`
+      );
+    } catch (sheetError) {
+      console.error(
+        "⚠️ Google Sheets save failed:",
+        sheetError.message
+      );
+
+      // Don't fail complete AI research
+      // if Google Sheets has an issue.
+    }
+
+    console.log(
+      "====================================================\n"
+    );
+
+    // ==================================================
     // NORMALIZE FINAL COMPANIES
     // ==================================================
 
     if (
-      Array.isArray(report.finalCompanies)
+      Array.isArray(
+        report.finalCompanies
+      )
     ) {
       report.finalCompanies =
         report.finalCompanies.map(
