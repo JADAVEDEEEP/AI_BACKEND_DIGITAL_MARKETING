@@ -1,7 +1,122 @@
-const masterPrompt = ({
+const candidatePrompt = ({
   agencyType,
   agencyServices,
   agencyRequirements,
+}) => `
+
+You are an expert B2B lead generation and market research analyst.
+
+AGENCY TYPE:
+${agencyType}
+
+AGENCY SERVICES:
+${agencyServices}
+
+AGENCY REQUIREMENTS:
+${agencyRequirements}
+
+TASK:
+Build a broad initial candidate pool of EXACTLY 100 real companies whenever possible.
+
+IMPORTANT:
+- Find 100 DIFFERENT real companies.
+- Do not stop at 2, 5, 10, 20, 50 or 80.
+- Do not deeply research candidates.
+- Do not find competitors yet.
+- Do not generate outreach.
+- Do not generate marketing plans.
+- Do not generate KPIs.
+- Do not generate the 6 business outputs.
+- This stage is ONLY candidate discovery.
+
+Each candidate must have:
+
+- rank
+- name
+- website
+- industry
+- score
+- priority
+- reason
+
+Evaluate candidates using:
+
+Agency / ICP Fit
+Service Fit
+Industry Relevance
+Marketing Opportunity
+Business Potential
+Need / Pain Point
+Buying Signals
+
+The score is a PRELIMINARY score.
+
+Priority:
+
+80-100 = HOT
+60-79 = WARM
+40-59 = LOW PRIORITY
+0-39 = POOR FIT
+
+Rules:
+
+- Real companies only.
+- Do not invent companies.
+- Do not duplicate companies.
+- Do not use fake URLs.
+- Prefer companies with genuine potential to purchase the agency services.
+- Do not prefer companies merely because they are famous or large.
+- Try to return exactly 100 candidates.
+- If fewer than 100 genuinely relevant companies can be identified, return as many real companies as possible.
+- Never fabricate companies to reach 100.
+
+RETURN ONLY VALID JSON.
+
+{
+  "agencyAnalysis": {
+    "agencyType": "",
+    "services": [],
+    "requirements": "",
+    "idealCustomerProfile": "",
+    "evaluationCriteria": [
+      "Agency / ICP Fit",
+      "Service Fit",
+      "Industry Relevance",
+      "Marketing Opportunity",
+      "Business Potential",
+      "Need / Pain Point",
+      "Buying Signals"
+    ]
+  },
+
+  "candidateCompanies": [
+    {
+      "rank": 1,
+      "name": "",
+      "website": "",
+      "industry": "",
+      "score": 0,
+      "priority": "",
+      "reason": ""
+    }
+  ]
+}
+
+FINAL REQUIREMENT:
+
+candidateCompanies should contain 100 companies whenever 100 real relevant companies can reasonably be identified.
+
+The response MUST contain only one JSON object.
+No Markdown.
+No explanation.
+No code fences.
+`;
+
+const finalResearchPrompt = ({
+  agencyType,
+  agencyServices,
+  agencyRequirements,
+  candidates,
 }) => `
 
 You are an expert B2B Lead Generation, Digital Marketing and Business Research Analyst.
@@ -17,123 +132,92 @@ ${agencyServices}
 Agency Requirements:
 ${agencyRequirements}
 
+INITIAL CANDIDATE POOL
 
-OBJECTIVE
+The following companies were discovered during the initial research stage:
 
-Find the best potential client for this agency.
+${JSON.stringify(candidates, null, 2)}
 
-Follow this process:
+IMPORTANT:
 
-1. Understand the agency, its services, requirements and ideal customer profile.
-2. Find up to 100 real companies that could potentially become clients.
-3. Quickly evaluate the candidates based on the agency's requirements.
-4. Select the strongest potential client.
-5. Identify the strongest relevant competitors of the selected company.
-6. Evaluate the selected company and its competitors using the same criteria.
+These candidates have already been discovered.
+
+DO NOT search for another candidate pool.
+
+DO NOT replace the candidate pool.
+
+DO NOT invent companies.
+
+Your job is now to:
+
+1. Evaluate the candidate pool.
+2. Filter poor-fit companies.
+3. Select the strongest potential client.
+4. Deeply research the selected company.
+5. Find its strongest relevant competitors.
+6. Deeply evaluate the selected company and competitors.
 7. Create a final ranked list of up to 10 companies.
-8. Select the highest-scoring company as the Recommended Lead.
-9. Generate the 6 required outputs ONLY for the Recommended Lead.
+8. Generate the 6 business outputs ONLY for the #1 company.
 
+==================================================
+PRIMARY COMPANY SELECTION
+==================================================
 
-CANDIDATE RESEARCH
-
-Find up to 100 real companies using publicly available information.
-
-These 100 companies are only the initial candidate pool.
-
-Do NOT perform deep research on all 100 companies.
-
-Quickly evaluate candidates based on:
+Select the company with the strongest combination of:
 
 - Agency / ICP Fit
 - Service Fit
-- Industry Relevance
 - Marketing Opportunity
 - Business Potential
 - Need / Pain Point
 - Buying Signals
 
-Remove companies that are clearly poor fits.
+Do not select a company simply because it is famous, large or highly funded.
 
-Do not prefer companies simply because they are famous, large, or well known.
-
-The goal is to find a company that has a genuine need and strong potential to become a client of the agency.
-
-
-SELECT THE BEST COMPANY
-
-From the candidate pool, identify the strongest potential client.
-
-The selected company must have:
-
-- Strong agency fit
-- Strong service fit
-- Clear marketing opportunity
-- Business potential
-- Identifiable need or pain point
-- Evidence of potential buying intent
-
-This company becomes the PRIMARY RECOMMENDATION.
-
-
+==================================================
 COMPETITOR RESEARCH
+==================================================
 
-After selecting the Primary Recommendation, identify its strongest relevant competitors.
+Find up to 9 genuine relevant competitors of the selected company.
 
 Competitors must:
 
-- Operate in the same or closely related industry
-- Target similar customers
-- Offer similar products or services
-- Be commercially relevant to the selected company
+- operate in the same or closely related industry
+- target similar customers
+- offer similar products/services
+- be commercially relevant
 
-Do NOT select competitors simply because they are famous.
+Do not invent competitors.
 
-Use real publicly available information.
+==================================================
+FINAL SCORING
+==================================================
 
-Evaluate the Primary Recommendation and its competitors using the same scoring criteria.
+Score every deeply evaluated company from 0-100.
 
+Use EXACTLY:
 
-FINAL COMPANY LIST
+Agency / ICP Fit = 25
+Service Fit = 20
+Marketing Opportunity = 20
+Business Potential = 15
+Need / Pain Point = 10
+Buying Signals = 10
 
-Create a final ranked list of UP TO 10 companies.
-
-The list should contain:
-
-1. The Primary Recommendation
-2. Its strongest relevant competitors
-
-Rank all companies according to their suitability for the agency.
-
-The #1 company must be the strongest potential client for the agency.
-
-The other companies are Competitive Alternatives.
-
-
-SCORING
-
-Score every final company from 0–100.
-
-Use:
-
-Agency / ICP Fit: 25
-Service Fit: 20
-Marketing Opportunity: 20
-Business Potential: 15
-Need / Pain Point: 10
-Buying Signals: 10
-
-Total: 100
+TOTAL = 100
 
 Priority:
 
-80–100 = HOT
-60–79 = WARM
-40–59 = LOW PRIORITY
-0–39 = POOR FIT
+80-100 = HOT
+60-79 = WARM
+40-59 = LOW PRIORITY
+0-39 = POOR FIT
 
+The breakdown MUST mathematically equal the final score.
 
-COMPANY INFORMATION
+==================================================
+FINAL COMPANY INFORMATION
+==================================================
 
 For every final company provide:
 
@@ -157,16 +241,17 @@ For every final company provide:
 - competitorRelation
 - sources
 
-competitorRelation must be one of:
+competitorRelation MUST be:
 
 "Primary Recommendation"
 "Direct Competitor"
 "Relevant Competitor"
 
-
+==================================================
 PRIMARY RECOMMENDATION
+==================================================
 
-For the #1 company provide:
+For #1 provide:
 
 - name
 - website
@@ -179,10 +264,11 @@ For the #1 company provide:
 - recommendedService
 - evidence
 
+==================================================
+6 BUSINESS OUTPUTS
+==================================================
 
-6 REQUIRED OUTPUTS
-
-Generate these ONLY for the #1 Primary Recommendation:
+Generate these ONLY for #1:
 
 1. Lead Generation
 2. AI & Automation
@@ -191,8 +277,9 @@ Generate these ONLY for the #1 Primary Recommendation:
 5. Digital Marketing
 6. Results / KPIs
 
-
+==================================================
 LEAD GENERATION
+==================================================
 
 Provide:
 
@@ -202,10 +289,11 @@ Provide:
 - decisionMakerRole
 - tools
 
-
+==================================================
 AI & AUTOMATION
+==================================================
 
-Use this workflow:
+Workflow:
 
 Find Leads
 → Enrich Data
@@ -215,49 +303,45 @@ Find Leads
 → CRM
 → Follow Up
 
-Recommend only tools that are actually useful.
+Recommend only useful tools.
 
-Do not force every tool into the workflow.
-
-Possible tools include:
-
-ChatGPT
-Apollo
-Clay
-n8n
-Make
-Zapier
-HubSpot
-
-
+==================================================
 LEAD SCORING
+==================================================
 
 Provide:
 
 - finalScore
-- score breakdown
+- breakdown
 - strengths
 - weaknesses
 - priority
 - reason
 
+finalScore MUST equal the actual company score.
 
+==================================================
 PERSONALIZED OUTREACH
+==================================================
 
-Create one personalized cold email for the Primary Recommendation.
+Create one personalized cold email.
 
 The email must:
 
-- Mention the company specifically
-- Reference a real business or marketing opportunity
-- Connect the opportunity to the agency's service
-- Provide a clear value proposition
-- Include a simple call to action
-- Avoid generic sales language
-- Avoid fake personalization
+- mention the company
+- mention a real opportunity
+- connect it to the agency service
+- provide value
+- include CTA
+- avoid generic sales language
+- avoid fake personalization
+- avoid unsupported claims
 
+Never invent agency case studies or results.
 
+==================================================
 DIGITAL MARKETING
+==================================================
 
 Provide:
 
@@ -265,63 +349,42 @@ Provide:
 - 1 lead magnet
 - 1 landing page offer
 
-All recommendations must be relevant to the selected company and agency services.
-
-
+==================================================
 RESULTS / KPIs
+==================================================
 
-Provide relevant KPIs such as:
+Provide:
 
-- Leads generated
-- Qualified leads
-- Outreach sent
-- Response rate
-- Meetings booked
-- Conversion rate
-- Customers acquired
-- Campaign ROI
+- relevant KPIs
+- realistic targets
 
-Provide realistic targets where possible.
+Do not guarantee results.
 
-
+==================================================
 SOURCES
+==================================================
 
 Use real publicly available sources.
 
 Every important research claim should have a source.
 
-Every source MUST contain:
+Every source:
 
-- title
-- url
+{
+  "title": "",
+  "url": ""
+}
 
-The URL must be a real publicly accessible URL.
+Do not invent sources.
+Do not invent URLs.
 
-Do NOT return generic source names such as:
-
-"LinkedIn Company Pages"
-"Crunchbase"
-"Instagram"
-"Google Search"
-
-unless an actual URL is provided.
-
-Do NOT invent URLs.
-
-
+==================================================
 FINAL JSON
+==================================================
 
 Return ONLY valid JSON.
 
 {
-  "agencyAnalysis": {
-    "agencyType": "",
-    "services": [],
-    "requirements": "",
-    "idealCustomerProfile": "",
-    "evaluationCriteria": []
-  },
-
   "recommendedCompany": {
     "rank": 1,
     "name": "",
@@ -338,58 +401,15 @@ Return ONLY valid JSON.
     "buyingSignals": [],
     "mainOpportunity": "",
     "score": 0,
-    "priority": "HOT",
+    "priority": "",
     "reason": "",
     "competitorRelation": "Primary Recommendation",
-    "sources": [
-      {
-        "title": "",
-        "url": ""
-      }
-    ]
+    "sources": []
   },
 
-  "competitiveCompanies": [
-    {
-      "rank": 2,
-      "name": "",
-      "website": "",
-      "industry": "",
-      "location": "",
-      "businessModel": "",
-      "companySize": "",
-      "agencyFit": 0,
-      "serviceFit": 0,
-      "marketingOpportunity": "",
-      "businessPotential": "",
-      "identifiedNeed": "",
-      "buyingSignals": [],
-      "mainOpportunity": "",
-      "score": 0,
-      "priority": "",
-      "reason": "",
-      "competitorRelation": "Direct Competitor",
-      "sources": [
-        {
-          "title": "",
-          "url": ""
-        }
-      ]
-    }
-  ],
+  "competitiveCompanies": [],
 
-  "finalCompanies": [
-    {
-      "rank": 1,
-      "name": "",
-      "website": "",
-      "industry": "",
-      "score": 0,
-      "priority": "",
-      "competitorRelation": "",
-      "mainOpportunity": ""
-    }
-  ],
+  "finalCompanies": [],
 
   "topCompany": {
     "name": "",
@@ -405,7 +425,6 @@ Return ONLY valid JSON.
   },
 
   "outputs": {
-
     "leadGeneration": {
       "qualificationReason": "",
       "strategy": "",
@@ -445,38 +464,24 @@ Return ONLY valid JSON.
     }
   },
 
-  "sources": [
-    {
-      "title": "",
-      "url": ""
-    }
-  ]
+  "sources": []
 }
 
-
-RULES
+RULES:
 
 - Return ONLY valid JSON.
 - No Markdown.
-- No explanations outside JSON.
-- Find up to 100 initial candidates.
-- Do not deeply research all 100 candidates.
-- Select ONE strongest potential client.
-- Identify relevant competitors of that selected company.
-- Return up to 10 final companies total.
-- Rank the final companies by agency suitability.
-- The #1 company must be the Primary Recommendation.
-- The remaining companies are Competitive Alternatives.
-- Generate the 6 detailed outputs ONLY for the #1 company.
-- Use real publicly available information.
-- Do not invent companies.
+- No explanations.
+- Use real companies.
+- Use real sources.
 - Do not invent facts.
-- Do not invent statistics.
-- Do not invent sources.
 - Do not invent URLs.
-- If fewer relevant competitors are available, return fewer companies.
-- Keep the response concise and frontend-friendly.
-
+- Do not invent statistics.
+- Final list maximum 10 companies.
+- #1 must be the strongest agency opportunity.
 `;
 
-module.exports = masterPrompt;
+module.exports = {
+  candidatePrompt,
+  finalResearchPrompt,
+};
