@@ -19,7 +19,7 @@ function parseGeminiJSON(text) {
 
   text = text.trim();
 
-  // Remove markdown fences if Gemini adds them
+  // Remove markdown code fences if Gemini adds them
   text = text
     .replace(/^```json\s*/i, "")
     .replace(/^```\s*/i, "")
@@ -46,6 +46,7 @@ function parseGeminiJSON(text) {
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
 
+    // Handle escaped characters
     if (escaped) {
       escaped = false;
       continue;
@@ -56,11 +57,13 @@ function parseGeminiJSON(text) {
       continue;
     }
 
+    // Handle string boundaries
     if (char === '"') {
       inString = !inString;
       continue;
     }
 
+    // Ignore brackets inside strings
     if (inString) {
       continue;
     }
@@ -83,13 +86,18 @@ function parseGeminiJSON(text) {
     throw new Error("Gemini returned incomplete JSON.");
   }
 
-  const cleanJson = text.substring(0, endIndex).trim();
+  const cleanJson = text
+    .substring(0, endIndex)
+    .trim();
 
   try {
     return JSON.parse(cleanJson);
   } catch (error) {
     console.error("JSON Parse Failed");
-    console.error("Clean JSON:", cleanJson.substring(0, 1000));
+    console.error(
+      "Clean JSON:",
+      cleanJson.substring(0, 2000)
+    );
 
     throw new Error(
       `Invalid JSON returned by Gemini: ${error.message}`
@@ -97,25 +105,37 @@ function parseGeminiJSON(text) {
   }
 }
 
-
 /**
  * Call Gemini.
  */
 async function callGemini(prompt, stageName) {
-  console.log(`\n================ ${stageName} ================`);
-  console.log("Prompt Length:", prompt.length);
-  console.log("Sending Request to Gemini...");
+  console.log(
+    `\n================ ${stageName} ================`
+  );
+
+  console.log(
+    "Prompt Length:",
+    prompt.length
+  );
+
+  console.log(
+    "Sending Request to Gemini..."
+  );
 
   const response = await ai.models.generateContent({
     model: "gemini-3.1-flash-lite",
+
     contents: prompt,
+
     config: {
       temperature: 0.3,
       responseMimeType: "application/json",
     },
   });
 
-  console.log(`${stageName} Response Received`);
+  console.log(
+    `${stageName} Response Received`
+  );
 
   const text = response.text?.trim();
 
@@ -125,24 +145,28 @@ async function callGemini(prompt, stageName) {
     );
   }
 
-  console.log(`${stageName} Response Length:`, text.length);
+  console.log(
+    `${stageName} Response Length:`,
+    text.length
+  );
 
   const parsed = parseGeminiJSON(text);
 
-  console.log(`${stageName} JSON Parsed Successfully`);
+  console.log(
+    `${stageName} JSON Parsed Successfully`
+  );
 
   return parsed;
 }
 
-
 /**
- * Main research function
+ * Main research function.
  *
  * Stage 1:
- * Discover 100 candidates
+ * Discover up to 100 candidates.
  *
  * Stage 2:
- * Evaluate candidates and generate final research
+ * Evaluate candidates and generate final research.
  */
 const generateCompanyReport = async ({
   agencyType,
@@ -155,17 +179,27 @@ const generateCompanyReport = async ({
     );
 
     console.log(
-      "          AI DIGITAL MARKETING RESEARCH"
+      "       AI DIGITAL MARKETING RESEARCH"
     );
 
     console.log(
       "=================================================="
     );
 
-    console.log("Agency Type:", agencyType);
-    console.log("Agency Services:", agencyServices);
-    console.log("Agency Requirements:", agencyRequirements);
+    console.log(
+      "Agency Type:",
+      agencyType
+    );
 
+    console.log(
+      "Agency Services:",
+      agencyServices
+    );
+
+    console.log(
+      "Agency Requirements:",
+      agencyRequirements
+    );
 
     // ==================================================
     // STAGE 1 — CANDIDATE DISCOVERY
@@ -203,16 +237,18 @@ const generateCompanyReport = async ({
       );
     }
 
-    // Warn instead of failing if Gemini returns less than 100.
+    // Gemini may sometimes return fewer than 100.
     if (candidates.length < 100) {
       console.warn(
         `⚠️ Stage 1 returned ${candidates.length} candidates instead of 100.`
       );
     }
 
-    // Remove duplicate companies by name
-    const uniqueCandidates = [];
+    // ==================================================
+    // REMOVE DUPLICATES
+    // ==================================================
 
+    const uniqueCandidates = [];
     const seenCompanies = new Set();
 
     for (const company of candidates) {
@@ -222,27 +258,38 @@ const generateCompanyReport = async ({
         .trim()
         .toLowerCase();
 
-      if (!key) continue;
+      if (!key) {
+        continue;
+      }
 
       if (seenCompanies.has(key)) {
         continue;
       }
 
       seenCompanies.add(key);
+
       uniqueCandidates.push(company);
     }
 
+    // Re-rank candidates after duplicate removal
+    const normalizedCandidates =
+      uniqueCandidates.map(
+        (company, index) => ({
+          ...company,
+          rank: index + 1,
+        })
+      );
+
     console.log(
       "Unique Candidates:",
-      uniqueCandidates.length
+      normalizedCandidates.length
     );
 
-    if (uniqueCandidates.length === 0) {
+    if (normalizedCandidates.length === 0) {
       throw new Error(
         "Stage 1 returned invalid candidate data."
       );
     }
-
 
     // ==================================================
     // STAGE 2 — FINAL RESEARCH
@@ -254,7 +301,7 @@ const generateCompanyReport = async ({
 
     console.log(
       "Sending",
-      uniqueCandidates.length,
+      normalizedCandidates.length,
       "candidates to Stage 2..."
     );
 
@@ -262,14 +309,13 @@ const generateCompanyReport = async ({
       agencyType,
       agencyServices,
       agencyRequirements,
-      candidates: uniqueCandidates,
+      candidates: normalizedCandidates,
     });
 
     const finalResult = await callGemini(
       stage2Prompt,
       "STAGE 2 — FINAL RESEARCH"
     );
-
 
     // ==================================================
     // COMBINE STAGE 1 + STAGE 2
@@ -278,10 +324,11 @@ const generateCompanyReport = async ({
     const report = {
       ...finalResult,
 
-      // Keep the complete candidate pool
-      candidateCompanies: uniqueCandidates,
+      // Keep complete initial candidate pool
+      candidateCompanies:
+        normalizedCandidates,
 
-      // Preserve agency analysis from stage 1
+      // Preserve agency analysis
       agencyAnalysis:
         finalResult?.agencyAnalysis ||
         candidateResult?.agencyAnalysis ||
@@ -293,9 +340,46 @@ const generateCompanyReport = async ({
         },
     };
 
+    // ==================================================
+    // NORMALIZE FINAL COMPANIES
+    // ==================================================
+
+    if (
+      Array.isArray(report.finalCompanies)
+    ) {
+      report.finalCompanies =
+        report.finalCompanies.map(
+          (company, index) => ({
+            ...company,
+            rank: index + 1,
+          })
+        );
+    } else {
+      report.finalCompanies = [];
+    }
 
     // ==================================================
-    // FINAL VALIDATION
+    // NORMALIZE COMPETITIVE COMPANIES
+    // ==================================================
+
+    if (
+      Array.isArray(
+        report.competitiveCompanies
+      )
+    ) {
+      report.competitiveCompanies =
+        report.competitiveCompanies.map(
+          (company, index) => ({
+            ...company,
+            rank: index + 2,
+          })
+        );
+    } else {
+      report.competitiveCompanies = [];
+    }
+
+    // ==================================================
+    // FINAL VALIDATION / LOGS
     // ==================================================
 
     console.log(
@@ -336,7 +420,6 @@ const generateCompanyReport = async ({
     return report;
 
   } catch (error) {
-
     console.error(
       "\n❌ AI SERVICE ERROR"
     );
@@ -362,7 +445,6 @@ const generateCompanyReport = async ({
     );
   }
 };
-
 
 module.exports = {
   generateCompanyReport,
