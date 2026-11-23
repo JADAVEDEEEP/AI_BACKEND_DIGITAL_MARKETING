@@ -775,3 +775,80 @@ Save candidate leads to Google Sheets
 Working end-to-end integration
 
 The Google Sheets integration completes the core bonus requirement of the assignment: Find a lead → research it with AI → score it → save it to Google Sheets.
+
+Automated Company Discovery & Qualification Pipeline
+
+The existing POST /api/research flow is unchanged. A second, production-oriented workflow runs as an asynchronous background job, discovers real companies from public sources, verifies each company's own website and only then lets the AI qualify and rank them.
+
+Pipeline
+
+Agency profile
+       ↓
+Query planning (AI + deterministic industry × location × signal queries)
+       ↓
+Discovery rounds (Gemini + Google Search grounding, Brave Search API, Google Programmable Search)
+       ↓  continues until saturation (no new companies) or the configured safety cap — no fixed 100 limit
+Deduplication (registrable domain, normalised name, redirects, sibling TLDs)
+       ↓
+Website resolution (search API only — websites are never guessed)
+       ↓
+Verification & scraping of each company's own website
+  - robots.txt (RFC 9309) + Crawl-delay respected, per-host rate limiting
+  - SSRF protection, timeouts, size limits, retries
+  - name, description, address, JSON-LD, social profiles, role-based business emails/phones
+  - every extracted fact stored with its source URL
+       ↓
+AI qualification in batches (evidence only, temperature 0)
+       ↓
+Deterministic scoring & ranking → Top 10
+       ↓
+Separate comparative AI evaluation of the Top 10 → NUMBER 1 + explanation
+
+Scoring (total 100; the server sums the breakdown, so it always matches the score)
+
+Agency / ICP Fit 20 · Service Fit 20 · Industry Relevance 15 · Potential Marketing Needs 20 · Business Potential 10 · Buying Signals 5 · Available Evidence 10 (computed by the server, not the AI)
+
+Priority bands are the same as the master prompt: HOT 80+, WARM 60–79, LOW PRIORITY 40–59, POOR FIT 0–39.
+
+Anti-fabrication rules
+
+- Only companies whose own website could be verified (or, if robots.txt blocks crawling, companies with search-result evidence) are scored.
+- Websites proposed by AI extraction must appear in the search results; otherwise they are discarded.
+- AI-reported locations are kept only if supported by the evidence.
+- In the final evaluation, every evidence item must cite a URL from that company's evidence; uncited or unknown URLs are dropped. The winner must be one of the Top 10 (otherwise retried, then deterministic fallback).
+- Only role-based business mailboxes (info@, sales@ …) are stored by default (CONTACT_EMAIL_POLICY). Social platforms are linked, never scraped.
+
+Discovery API
+
+POST /api/discovery/jobs                → 202 { data: { id, status: "queued" } }
+GET  /api/discovery/jobs                → list jobs
+GET  /api/discovery/jobs/:id            → status, stage, progress (?full=true for top10/winner/queries)
+GET  /api/discovery/jobs/:id/companies  → all discovered companies (?status=qualified,invalid&sort=score|discovered|name&page=&limit=&full=true)
+GET  /api/discovery/jobs/:id/top10      → ranked top 10 with scores, breakdowns and evidence
+GET  /api/discovery/jobs/:id/winner     → NUMBER 1 company + why, strengths, matching requirements, cited evidence
+POST /api/discovery/jobs/:id/cancel
+POST /api/discovery/jobs/:id/retry      → re-queue a failed job (resumes from its last stage)
+
+Request body
+
+{
+  "agencyName": "Bright Social",
+  "agencyType": "Social Media Marketing Agency",
+  "agencyServices": ["Instagram Marketing", "TikTok Content", "Paid Social"],
+  "targetIndustries": ["Food & Beverage", "Beauty", "Fitness"],
+  "targetLocations": ["Austin, TX"],
+  "agencyLocation": "Austin, TX",
+  "idealCustomerProfile": "Independent consumer brands with 1-20 locations",
+  "companySize": "5-200 employees",
+  "businessRequirements": "Companies showing growth signals such as new locations or product launches",
+  "excludedCompanies": ["existing-client.com"],
+  "options": { "maxCandidates": 1000, "minQualifiedScore": 40 }
+}
+
+Company statuses: discovered, needs_website, verified, robots_blocked, unreachable, invalid, duplicate, qualified, disqualified, qualification_failed.
+
+Storage (MongoDB, set MONGODB_URI): DiscoveryJob (profile, progress, queries, top10, finalEvaluation, winner), DiscoveredCompany (one per job+domain: provenance, scraped profile, evidence, qualification scores, top-10 flags), CompanyCache (cross-job scrape cache with TTL). Without MONGODB_URI an in-memory store is used for development.
+
+Scaling: jobs are claimed with a renewable lease in the database, so several instances can run workers safely; a crashed job is resumed by any instance from its last completed stage. AI, search and crawl concurrency are independently configurable (see .env.example).
+
+Tests: npm test (unit, repository contract, job runner and full API end-to-end tests with a fake AI and fake web). Set TEST_MONGODB_URI to also run the repository contract against MongoDB.

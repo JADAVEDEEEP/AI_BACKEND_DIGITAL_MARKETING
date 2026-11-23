@@ -57,12 +57,20 @@ function createAuth() {
 // GOOGLE SHEETS CLIENT
 // ==========================================
 
-const auth = createAuth();
+// Created lazily so a missing Google credential no longer crashes the
+// whole server at startup; saving to Sheets simply fails (and the
+// existing caller already treats that as non-fatal).
+let sheets = null;
 
-const sheets = google.sheets({
-  version: "v4",
-  auth,
-});
+function getSheets() {
+  if (!sheets) {
+    sheets = google.sheets({
+      version: "v4",
+      auth: createAuth(),
+    });
+  }
+  return sheets;
+}
 
 // ==========================================
 // SAVE RESEARCH
@@ -130,7 +138,7 @@ async function saveResearchToSheet(report) {
       "Clearing previous Google Sheet data..."
     );
 
-    await sheets.spreadsheets.values.clear({
+    await getSheets().spreadsheets.values.clear({
       spreadsheetId,
       range: "Sheet1!A:G",
     });
@@ -139,7 +147,7 @@ async function saveResearchToSheet(report) {
       "Writing candidates to Google Sheets..."
     );
 
-    await sheets.spreadsheets.values.update({
+    await getSheets().spreadsheets.values.update({
       spreadsheetId,
       range: "Sheet1!A1",
       valueInputOption: "USER_ENTERED",
